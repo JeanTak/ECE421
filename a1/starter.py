@@ -1,6 +1,7 @@
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
+from numpy import linalg as LA
 
 def loadData():
 	with np.load('notMNIST.npz') as data:
@@ -27,51 +28,48 @@ def MSE(W, b, x, y, reg):
 	# ref: https://chunml.github.io/ChunML.github.io/tutorial/Regularization/
 	# ref: https://en.wikipedia.org/wiki/Linear_regression
 
-	# the predicted y
-	predicted = [sum(W * x[i]) + b[i] for i in range(len(x))]
+	predicted = np.sign([sum(W * x[i] + b) for i in range(len(x))])	 # the predicted y
 
-	# the amount of data
-	m = len(predicted)
+	m = len(predicted)	 # the amount of data
+
+	for e in range(m):	# change -1 to 0
+		if predicted[e] == -1: predicted[e] = 0
 	
 	# calculate regularized MSE
 	mse = sum((predicted - y) ** 2) / (2 * m) + sum(W ** 2) * reg / (2 * m)
-	return mse
 
-# a = [[1,2,3,4,5],[1,2,3,4,10],[1,2,3,4,5],[1,2,3,4,5],[1,2,3,4,5]]	
-# MSE(np.array([1,2,3,4,5]), np.array([1,2,3,4,5]), np.array(a), np.array([1,2,3,4,5]), 1)
+	return mse
 
 
 
 def gradMSE(W, b, x, y, reg):
 	# ref: https://chunml.github.io/ChunML.github.io/tutorial/Regularization/
 
-	# the predicted y
-	predicted = [sum(W * x[i]) + b[i] for i in range(len(x))]
+	predicted = np.sign([sum(W * x[i] + b) for i in range(len(x))]) # the predicted y
 
-	# the amount of data
-	m = len(predicted)
+	m = len(predicted) # the amount of data
+
+	for e in range(m): # change -1 to 0
+		if predicted[e] == -1: predicted[e] = 0
 
 	# GRADIENT OF WEIGHT
 	grad_weight = np.array([])
-	for j in range(len(W)):
 
+	for j in range(len(W)): 	# dimension -> 784
 		temp = reg * W[j]
 
-		for i in range(m): temp += (predicted[i] - y[i]) * x[i][j]
-		
+		for i in range(m):		# dimension -> 3500
+			temp += (predicted[i] - y[i]) * x[i][j]
 		temp = temp / m
 
-		np.append(grad_weight, temp)
+		grad_weight = np.append(grad_weight, temp)
 
 	# GRADIENT OF BIAS
-	grad_bias = sum([predicted - y]) / m
-
-	return grad_weight, grad_bias
+	grad_bias = sum(predicted - y) / m
+	grad_bias = np.full(W.shape[0], grad_bias)	
 	
-data = np.load("data.npy", mmap_mode='r')
-target = np.load("target.npy", mmap_mode='r')
-print(data[1][1])
-print(target[1][1])
+	return grad_weight, grad_bias
+
 
 
 # def crossEntropyLoss(W, b, x, y, reg):
@@ -80,10 +78,44 @@ print(target[1][1])
 # def gradCE(W, b, x, y, reg):
 #     # Your implementation here
 
-# def grad_descent(W, b, trainingData, trainingLabels, alpha, iterations, reg, EPS):
+def grad_descent(W, b, trainingData, trainingLabels, alpha, iterations, reg, EPS):
 	
+	for i in range(iterations):		
+		grad_W, grad_b = gradMSE(W, b, trainingData, trainingLabels, reg)
+
+		u_W = grad_W / -LA.norm(grad_W)
+		u_b = grad_b / -LA.norm(grad_b)
+
+		W += alpha * u_W
+		b += alpha * u_b 
+
+		print("iteration: ", i)
+		cost = MSE(W, b, trainingData, trainingLabels, reg)
+		print("cost: ", cost)
+
+		if cost <= EPS: return W, b
+	
+	return W, b
+
 
 # def buildGraph(beta1=None, beta2=None, epsilon=None, lossType=None, learning_rate=None):
 #     # Your implementation here
 
+trainingData, validationData, testingData, trainingTarget, validationTarget, testingTarget = loadData()
+trainingData = trainingData.reshape(trainingData.shape[0], trainingData.shape[1] * trainingData.shape[2])
+validationData = validationData.reshape(validationData.shape[0], validationData.shape[1] * validationData.shape[2])
+testingData = testingData.reshape(testingData.shape[0], testingData.shape[1] * testingData.shape[2])
+
+weight = np.array([1] * trainingData.shape[1], dtype=float)
+bias = np.array([1] * trainingData.shape[1], dtype=float)
+
+trainingTarget = trainingTarget.reshape(trainingTarget.shape[0])
+validationTarget = validationTarget.reshape(validationTarget.shape[0])
+testingTarget = testingTarget.reshape(testingTarget.shape[0])
+
+W, b = grad_descent(weight, bias, trainingData, trainingTarget, 10, 5000, 0, 0.02)
+
+# pre = abs(trainData[0]) < 0.5
+# print(pre)
+# print(pre.all())
 
