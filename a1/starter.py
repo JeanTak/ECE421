@@ -25,19 +25,24 @@ def loadData():
 
 
 
-
 def calculate_binary_prediction(W, b, x):
 	
-	predicted = np.sign([sum(W * x[i] + b) for i in range(len(x))]) # the predicted y
+	# the predicted y
+	# predicted = np.sign([sum(W * x[i]) + b for i in range(len(x))]) 
 
-	num = len(predicted) # the amount of data
+	# predicted[predicted < 0] = 0
 
-	return predicted, num  # return the predicted result and number of prediction
+	predicted = np.array([sum(W * x[i]) + b for i in range(len(x))])
+
+	return predicted, len(predicted)  # return the predicted result and number of prediction
 
 
 def calculate_logistic_prediction(W, b, x):
 
-	predicted = np.array([1 / (1 + math.exp(-sum(W * x[i] + b))) for i in range(len(x))], dtype=float) # the predicted y
+	# the predicted y
+	predicted = np.array([1 / (1 + math.exp(-(sum(W * x[i]) + b))) for i in range(len(x))], dtype=float) 
+
+	predicted[predicted < 0] = 0
 
 	return predicted, len(predicted)  # return the predicted result and number of prediction
 
@@ -47,7 +52,7 @@ def MSE(W, b, x, y, reg):
 	predicted, m = calculate_binary_prediction(W, b, x)
 
 	# calculate regularized MSE
-	mse = sum((predicted - y) ** 2) / (2 * m) + sum(W ** 2) * reg / (2 * m)
+	mse = sum((predicted - y) ** 2) / (2 * m) + sum(W ** 2) * reg / 2
 
 	return mse
 
@@ -58,23 +63,20 @@ def gradMSE(W, b, x, y, reg):
 
 	# GRADIENT OF WEIGHT
 	grad_weight = np.array([reg * W[j] + sum((predicted[i] - y[i]) * x[i][j] 
-													for i in range(m)) for j in range(len(W))])
+																for i in range(m)) / m for j in range(len(W))])
 	# GRADIENT OF BIAS
 	grad_bias = sum(predicted - y) / m
-	grad_bias = np.full(W.shape[0], grad_bias)	
 	
 	return grad_weight, grad_bias
-
 
 
 def crossEntropyLoss(W, b, x, y, reg):
 
 	predicted, m = calculate_logistic_prediction(W, b, x)
-
-	ce = sum([-(y[i] * math.log(predicted[i])) - (1 - y[i]) * math.log(1 - predicted[i]) for i in range(m)]) / m + sum(W ** 2) * reg / (2 * m)
+	# ce = sum([-(y[i] * math.log(predicted[i])) - (1 - y[i]) * math.log(1 - predicted[i]) for i in range(m)]) / m + sum(W ** 2) * reg / (2 * m)
+	ce = sum([-(y[i] * math.log(predicted[i])) - (1 - y[i]) * math.log(1 - predicted[i]) for i in range(m)]) / m + sum(W ** 2) * reg / 2
 
 	return ce
-
 
 
 def gradCE(W, b, x, y, reg):
@@ -82,18 +84,19 @@ def gradCE(W, b, x, y, reg):
 	predicted, m = calculate_logistic_prediction(W, b, x)
 
 	# GRADIENT OF WEIGHT
-	grad_weight = np.array([reg * W[j] + sum((predicted[i] - y[i]) * x[i][j] 
-													for i in range(m)) for j in range(len(W))])
+	# grad_weight = np.array([reg * W[j] / m + sum((predicted[i] - y[i]) * x[i][j] for i in range(m)) / m for j in range(len(W))])
+	grad_weight = np.array([reg * W[j] + sum((predicted[i] - y[i]) * x[i][j] for i in range(m)) / m for j in range(len(W))])
+
 	# GRADIENT OF BIAS
 	grad_bias = sum(predicted - y) / m
-	grad_bias = np.full(W.shape[0], grad_bias)	
-	
+
 	return grad_weight, grad_bias
 	
 
 
 def grad_descent(W, b, trainingData, trainingLabels, alpha, iterations, reg, EPS, lossType="None"):
 	
+	prev_diff = 0 
 	for i in range(iterations):		
 
 		if lossType == "None": 
@@ -106,12 +109,13 @@ def grad_descent(W, b, trainingData, trainingLabels, alpha, iterations, reg, EPS
 			print("Undefined loss type, please try again")
 			return
 
-		u_W = grad_W / -LA.norm(grad_W)
-		u_b = grad_b / -LA.norm(grad_b)
+		# u_W = grad_W / -LA.norm(grad_W)
+		# u_b = grad_b / -LA.norm(grad_b)
 
-		W += alpha * u_W
-		b += alpha * u_b 
-
+		# W += alpha * u_W
+		# b += alpha * u_b * grad_b 
+		W -= alpha * grad_W
+		b -= alpha + grad_b
 		print("iteration: ", i)
 		print("weight[0]: ", weight[0])
 		
@@ -126,18 +130,42 @@ def grad_descent(W, b, trainingData, trainingLabels, alpha, iterations, reg, EPS
 		print("cost: ", cost)
 		print(" ")
 
-		if cost <= EPS: return W, b
-	
+		# if cost <= EPS: return W, b
+		if abs(prev_diff - LA.norm(W)) <= EPS: return W, b
+		prev_diff = LA.norm(W)
+
 	return W, b
 
 
-# def buildGraph(beta1=None, beta2=None, epsilon=None, lossType=None, learning_rate=None):
-#     # Your implementation here
+def buildGraph(beta1=None, beta2=None, epsilon=None, lossType=None, learning_rate=None):
+
+	trainingData, validationData, testingData, trainingTarget, validationTarget, testingTarget = loadData()
+
+	trainingData = trainingData.reshape(trainingData.shape[0], trainingData.shape[1] * trainingData.shape[2])
+	validationData = validationData.reshape(validationData.shape[0], validationData.shape[1] * validationData.shape[2])
+	testingData = testingData.reshape(testingData.shape[0], testingData.shape[1] * testingData.shape[2])
+
+	trainingTarget = trainingTarget.reshape(trainingTarget.shape[0])
+	validationTarget = validationTarget.reshape(validationTarget.shape[0])
+	testingTarget = testingTarget.reshape(testingTarget.shape[0])
+
+	x = tf.placeholder('float')
+	y = tf.placeholder('float')
+	
+	weights = tf.Variable(tf.random.truncated_normal(shape=, stddev=0.5))
+	bias = tf.Variable(tf.random.truncated_normal(shape=1, stddev=0.5))
+	
+
+	# loss = tf.losses.sigmoid_cross_entropy()
+
 
 
 def accuracy(W, b, x, y):
 	predicted, m = calculate_binary_prediction(W, b, x)
 	
+	predicted[predicted <= 0.5] = 0
+	predicted[predicted > 0.5] = 1
+
 	error_num = sum(abs(predicted - y))
 
 	accuracy = 1 - error_num / m
@@ -156,10 +184,18 @@ trainingTarget = trainingTarget.reshape(trainingTarget.shape[0])
 validationTarget = validationTarget.reshape(validationTarget.shape[0])
 testingTarget = testingTarget.reshape(testingTarget.shape[0])
 
-weight = np.array([1] * trainingData.shape[1], dtype=float)
-bias = 1
 
-W, b = grad_descent(weight, bias, trainingData, trainingTarget, alpha=10, iterations=5000, reg=0, EPS=0.02, lossType="None")
+# # LINEAR
+weight = np.array([0] * trainingData.shape[1], dtype=float)
+bias = 1
+W, b = grad_descent(weight, bias, trainingData, trainingTarget, alpha=0.005, iterations=5000, reg=0, EPS=0, lossType="None")
+
+
+
+# # LOGISTIC
+# weight = np.array([0] * trainingData.shape[1], dtype=float)
+# bias = 1
+# W, b = grad_descent(weight, bias, trainingData, trainingTarget, alpha=0.01, iterations=5000, reg=0.1, EPS=0.00000001, lossType="CE")
 
 accuracy = accuracy(W, b, validationData, validationTarget)
 
