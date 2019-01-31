@@ -62,8 +62,7 @@ def gradMSE(W, b, x, y, reg):
 	predicted, m = calculate_binary_prediction(W, b, x)
 
 	# GRADIENT OF WEIGHT
-	grad_weight = np.array([reg * W[j] + sum((predicted[i] - y[i]) * x[i][j] 
-																for i in range(m)) / m for j in range(len(W))])
+	grad_weight = np.array([reg * W[j] + sum((predicted[i] - y[i]) * x[i][j] for i in range(m)) / m for j in range(len(W))])
 	# GRADIENT OF BIAS
 	grad_bias = sum(predicted - y) / m
 	
