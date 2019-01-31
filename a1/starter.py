@@ -117,7 +117,7 @@ def grad_descent(W, b, trainingData, trainingLabels, alpha, iterations, reg, EPS
 		W -= alpha * grad_W
 		b -= alpha + grad_b
 		print("iteration: ", i)
-		print("weight[0]: ", weight[0])
+		print("weight[0]: ", W[0])
 		
 		if lossType == "None": 		
 			cost = MSE(W, b, trainingData, trainingLabels, reg)
@@ -151,9 +151,12 @@ def buildGraph(beta1=None, beta2=None, epsilon=None, lossType=None, learning_rat
 
 	x = tf.placeholder('float')
 	y = tf.placeholder('float')
-	
-	weights = tf.Variable(tf.random.truncated_normal(shape=, stddev=0.5))
-	bias = tf.Variable(tf.random.truncated_normal(shape=1, stddev=0.5))
+
+	weight = tf.Variable(tf.truncated_normal(shape=trainingData.shape[1], stddev=0.5))
+	bias = tf.Variable(tf.truncated_normal(shape=1, stddev=0.5))
+
+
+	# bias = tf.Variable(tf.random.truncated_normal(shape=1, stddev=0.5))
 	
 
 	# loss = tf.losses.sigmoid_cross_entropy()
@@ -173,36 +176,32 @@ def accuracy(W, b, x, y):
 	return accuracy
 	
 
+def regression_training():
+	trainingData, validationData, testingData, trainingTarget, validationTarget, testingTarget = loadData()
 
-trainingData, validationData, testingData, trainingTarget, validationTarget, testingTarget = loadData()
+	trainingData = trainingData.reshape(trainingData.shape[0], trainingData.shape[1] * trainingData.shape[2])
+	validationData = validationData.reshape(validationData.shape[0], validationData.shape[1] * validationData.shape[2])
+	testingData = testingData.reshape(testingData.shape[0], testingData.shape[1] * testingData.shape[2])
 
-trainingData = trainingData.reshape(trainingData.shape[0], trainingData.shape[1] * trainingData.shape[2])
-validationData = validationData.reshape(validationData.shape[0], validationData.shape[1] * validationData.shape[2])
-testingData = testingData.reshape(testingData.shape[0], testingData.shape[1] * testingData.shape[2])
-
-trainingTarget = trainingTarget.reshape(trainingTarget.shape[0])
-validationTarget = validationTarget.reshape(validationTarget.shape[0])
-testingTarget = testingTarget.reshape(testingTarget.shape[0])
-
-
-# # LINEAR
-weight = np.array([0] * trainingData.shape[1], dtype=float)
-bias = 1
-W, b = grad_descent(weight, bias, trainingData, trainingTarget, alpha=0.005, iterations=5000, reg=0, EPS=0, lossType="None")
+	trainingTarget = trainingTarget.reshape(trainingTarget.shape[0])
+	validationTarget = validationTarget.reshape(validationTarget.shape[0])
+	testingTarget = testingTarget.reshape(testingTarget.shape[0])
 
 
+	# # LINEAR
+	# weight = np.array([0] * trainingData.shape[1], dtype=float)
+	# bias = 1
+	# W, b = grad_descent(weight, bias, trainingData, trainingTarget, alpha=0.005, iterations=5000, reg=0, EPS=0, lossType="None")
 
-# # LOGISTIC
-# weight = np.array([0] * trainingData.shape[1], dtype=float)
-# bias = 1
-# W, b = grad_descent(weight, bias, trainingData, trainingTarget, alpha=0.01, iterations=5000, reg=0.1, EPS=0.00000001, lossType="CE")
+	# LOGISTIC
+	weight = np.array([0.0001] * trainingData.shape[1], dtype=float)
+	bias = 1
+	W, b = grad_descent(weight, bias, trainingData, trainingTarget, alpha=0.05, iterations=5000, reg=0.1, EPS=0.00000001, lossType="CE")
 
-accuracy = accuracy(W, b, validationData, validationTarget)
+	accuracies = accuracy(W, b, validationData, validationTarget)
 
-# pre = abs(trainData[0]) < 0.5
-# print(pre)
-# print(pre.all())
 
+regression_training()
 
 # ref: https://chunml.github.io/ChunML.github.io/tutorial/Regularization/
 # ref: https://en.wikipedia.org/wiki/Linear_regression
