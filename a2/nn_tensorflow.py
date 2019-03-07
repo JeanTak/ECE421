@@ -39,8 +39,7 @@ def shuffle(trainData, trainTarget):
     data, target = trainData[randIndx], target[randIndx]
     return data, target
 
-
-def convolutional_neural_network(x):
+def convolutional_neural_network(x, is_dropout, dropout_rate=0.9):
 
 	tf.set_random_seed(421)
 	
@@ -74,16 +73,19 @@ def convolutional_neural_network(x):
 	# Fully connected layer (with 784 output units, i.e. corresponding to each pixel)
 	fc1 = tf.add(tf.matmul(flatten_l, weights['w_fc1']), biases['b_fc1'], name='logit')
 
-	#ReLU activation
+	# ReLU activation
 	fc1_relu = tf.nn.relu(fc1)
 
+	# Dropout
+	dropout_layer = tf.layers.dropout(fc1_relu, rate=dropout_rate, training=is_dropout)
+
 	# Fully connected layer (with 10 output units, i.e. corresponding to each class)
-	fc2 = tf.add(tf.matmul(fc1_relu, weights['w_fc2']), biases['b_fc2'], name='logit2')
+	fc2 = tf.add(tf.matmul(dropout_layer, weights['w_fc2']), biases['b_fc2'], name='logit2')
 
 	return fc2, weights
 
 
-def train_neural_network(batch_size=32, n_classes=10, iterations=50, learning_rate=0.0001, reg=0.01, is_reg=False, only_final_accu=False):
+def train_neural_network(batch_size=32, n_classes=10, iterations=50, learning_rate=0.0001, reg=0.01, is_reg=False, only_final_accu=False, dropout=False, dropout_rate=0.9):
 
 	# Load Data
 	trainingData, validationData, testingData, trainingTarget, validationTarget, testingTarget = loadData()
@@ -100,11 +102,13 @@ def train_neural_network(batch_size=32, n_classes=10, iterations=50, learning_ra
 
 	x = tf.placeholder(dtype=tf.float32, name="data")
 	y = tf.placeholder(dtype=tf.float32, name="predictions")
+	is_dropout = tf.placeholder_with_default(input=False, shape=(), name='is_dropout')
 
-	predictions, weights = convolutional_neural_network(x)
+	predictions, weights = convolutional_neural_network(x, is_dropout=is_dropout, dropout_rate=dropout_rate)
 
 	# Softmax output + Cross Entropy loss
-	CE_loss = tf.reduce_mean(tf.losses.softmax_cross_entropy(y, predictions))
+	# CE_loss = tf.reduce_mean(tf.losses.softmax_cross_entropy(y, predictions))
+	CE_loss = tf.losses.softmax_cross_entropy(y, predictions)
 
 	# Regularization
 	if is_reg:
@@ -112,7 +116,8 @@ def train_neural_network(batch_size=32, n_classes=10, iterations=50, learning_ra
 		regularizer0 = tf.nn.l2_loss(weights['w_conv'])
 		regularizer1 = tf.nn.l2_loss(weights['w_fc1'])
 		regularizer2 = tf.nn.l2_loss(weights['w_fc2'])
-		CE_loss = tf.reduce_mean(CE_loss + reg * regularizer0 + reg * regularizer1 + reg * regularizer2)
+		# CE_loss = tf.reduce_mean(CE_loss + reg * regularizer0 + reg * regularizer1 + reg * regularizer2)
+		CE_loss = CE_loss + reg * regularizer0 + reg * regularizer1 + reg * regularizer2
 
 	# Adam Optmizer
 	optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(CE_loss)
@@ -127,8 +132,31 @@ def train_neural_network(batch_size=32, n_classes=10, iterations=50, learning_ra
 	with tf.Session() as sess:
 		
 		print("Amount of Samples: ", num_training_sample)
+		if dropout: print('dropout layer used, possibility: ', dropout_rate)
 
 		sess.run(tf.global_variables_initializer())
+
+		# Accuracy and loss with initial weights and bias
+		accu_training, loss_training = sess.run([accuracy, CE_loss], feed_dict={is_dropout: False, x: trainingData, y: trainingTarget})
+		accu_valid, loss_valid = sess.run([accuracy, CE_loss], feed_dict={is_dropout: False, x: validationData, y: validationTarget})
+		accu_testing, loss_testing = sess.run([accuracy, CE_loss], feed_dict={is_dropout: False, x: testingData, y: testingTarget})
+	
+		train_cost_list.append(loss_training)
+		valid_cost_list.append(loss_valid)
+		test_cost_list.append(loss_testing)
+
+		train_acculist.append(accu_training)
+		valid_acculist.append(accu_valid)
+		test_acculist.append(accu_testing)
+
+		print("initial train loss(CE): ", loss_training)
+		print("initial validation loss(CE): ", loss_valid)
+		print("initial testing loss(CE): ", loss_testing)
+		print('initial training Accuracy:', accu_training)
+		print('initial validation Accuracy:', accu_valid)
+		print('initial testing Accuracy:', accu_testing)
+
+
 
 		for epoch in range(iterations):
 			
@@ -143,16 +171,16 @@ def train_neural_network(batch_size=32, n_classes=10, iterations=50, learning_ra
 
 				start, end = i, i + batch_size
 
-				_, cost = sess.run([optimizer, CE_loss], feed_dict={x: trainingData[start:end], y: trainingTarget[start:end]})
+				_, cost = sess.run([optimizer, CE_loss], feed_dict={is_dropout: dropout, x: trainingData[start:end], y: trainingTarget[start:end]})
 				epoch_loss += cost
 				i += batch_size
 				# print("Batch: ", i, ", Batch Loss: ", cost)
 
 			print("epoch: ",epoch)
 			if not only_final_accu:
-				accu_training, loss_training = sess.run([accuracy, CE_loss], feed_dict={x: trainingData, y: trainingTarget})
-				accu_valid, loss_valid = sess.run([accuracy, CE_loss], feed_dict={x: validationData, y: validationTarget})
-				accu_testing, loss_testing = sess.run([accuracy, CE_loss], feed_dict={x: testingData, y: testingTarget})
+				accu_training, loss_training = sess.run([accuracy, CE_loss], feed_dict={is_dropout: False, x: trainingData, y: trainingTarget})
+				accu_valid, loss_valid = sess.run([accuracy, CE_loss], feed_dict={is_dropout: False, x: validationData, y: validationTarget})
+				accu_testing, loss_testing = sess.run([accuracy, CE_loss], feed_dict={is_dropout: False, x: testingData, y: testingTarget})
 			
 				train_cost_list.append(loss_training)
 				valid_cost_list.append(loss_valid)
@@ -170,9 +198,9 @@ def train_neural_network(batch_size=32, n_classes=10, iterations=50, learning_ra
 				print('Testing Accuracy:', accu_testing)
 
 		if only_final_accu:
-			accu_training, loss_training = sess.run([accuracy, CE_loss], feed_dict={x: trainingData, y: trainingTarget})
-			accu_valid, loss_valid = sess.run([accuracy, CE_loss], feed_dict={x: validationData, y: validationTarget})
-			accu_testing, loss_testing = sess.run([accuracy, CE_loss], feed_dict={x: testingData, y: testingTarget})
+			accu_training, loss_training = sess.run([accuracy, CE_loss], feed_dict={is_dropout: False, x: trainingData, y: trainingTarget})
+			accu_valid, loss_valid = sess.run([accuracy, CE_loss], feed_dict={is_dropout: False, x: validationData, y: validationTarget})
+			accu_testing, loss_testing = sess.run([accuracy, CE_loss], feed_dict={is_dropout: False, x: testingData, y: testingTarget})
 		
 			train_cost_list.append(loss_training)
 			valid_cost_list.append(loss_valid)
@@ -223,9 +251,12 @@ def model_training():
 def L2_Normalization():
 	train_cost_list, valid_cost_list, test_cost_list, train_acculist, valid_acculist, test_acculist = train_neural_network(is_reg=True, only_final_accu=True, reg=0.5)
 
-L2_Normalization()
-# model_training()
+def Dropout():
+	train_cost_list, valid_cost_list, test_cost_list, train_acculist, valid_acculist, test_acculist = train_neural_network(is_reg=False, only_final_accu=True, reg=0.5, dropout=True, dropout_rate=0.5)	
 
+# L2_Normalization()
+# model_training()
+Dropout()
 
 # train_neural_network()
 
