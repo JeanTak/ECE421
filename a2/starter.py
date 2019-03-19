@@ -43,21 +43,44 @@ def shuffle(trainData, trainTarget):
     return data, target
 
 
-# def relu(x):
-#     # TODO
-
-# def softmax(x):
-#     # TODO
 
 
-# def computeLayer(X, W, b):
-#     # TODO
+# 1.1 HELPER FUNCTIONS
+def relu(x):
+	return max(x, 0)
 
-# def CE(target, prediction):
+def softmax(x):
+	exp_x = np.exp(x)
+	return np.divide(exp_x, np.sum(exp_x))
 
-#     # TODO
 
-# def gradCE(target, prediction):
+def computeLayer(X, W, b):
+	predict = np.dot(X, W) + b
+	return predict
 
-#     # TODO
+def CE(target, prediction):
+	score = softmax(prediction)
+	ce = np.dot(np.transpose(target), np.log(score))
+	return ce / len(target)
 
+def gradCE(target, prediction):
+	grad_ce = np.subtract(target, prediction)
+	return grad_ce / len(target)
+
+
+
+# 1.2 BACKPROPAGATION DERIVATION
+
+def grad_relu(x):
+	return max(np.sign(x), 0)
+
+def grad_outer_weight_bias(target, prediction, activations):
+	delta = np.multiply(gradCE(target, prediction), grad_relu(target))
+	grad_w = np.multiply(delta, activations[-1].transpose())
+	grad_b = np.sum(delta)
+	return grad_w, grad_b, delta
+
+# def grad_hidden_weight_bias(prediction, delta_, activations, weights, l):
+	# delta_cur = np.dot(weights[-l+1].transpose(), delta_)
+
+# ref: https://deepnotes.io/softmax-crossentropy
